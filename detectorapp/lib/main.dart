@@ -209,7 +209,24 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildResultCard(ClassificationResult result) {
-    Color cardColor = result.label == 'Saludable' ? Colors.green : Colors.orange;
+    Color cardColor;
+    switch (result.label) {
+      case 'Saludable':
+        cardColor = Colors.green;
+        break;
+      case 'Riesgo Leve':
+        cardColor = Colors.orange;
+        break;
+      case 'Posible escoliosis':
+        cardColor = Colors.red;
+        break;
+      default:
+        cardColor = Colors.grey;
+    }
+
+    // --- NUEVO: Extraer datos de asimetría para mostrarlos ---
+    final double shoulderYDiff = result.rawFeatures.isNotEmpty ? result.rawFeatures[0] : 0.0;
+    final double hipYDiff = result.rawFeatures.length > 1 ? result.rawFeatures[1] : 0.0;
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 20.0),
@@ -231,6 +248,20 @@ class _HomeScreenState extends State<HomeScreen> {
             Text('Confianza: ${(result.confidence * 100).toStringAsFixed(1)}%'),
             const Divider(),
             Text(result.description, style: const TextStyle(fontSize: 16)),
+            
+            // --- NUEVO: Sección de Datos de Asimetría ---
+            if (result.rawFeatures.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              const Divider(),
+              const SizedBox(height: 8),
+              const Text(
+                'DATOS DE ASIMETRÍA (eje Y)',
+                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black54),
+              ),
+              const SizedBox(height: 8),
+              Text('Diferencia Hombros: ${shoulderYDiff.toStringAsFixed(3)}'),
+              Text('Diferencia Caderas: ${hipYDiff.toStringAsFixed(3)}'),
+            ]
           ],
         ),
       ),
