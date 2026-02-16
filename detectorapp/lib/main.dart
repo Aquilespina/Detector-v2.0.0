@@ -2,7 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
-// Importar los servicios de IA
+// Importar los servicios de IA actualizados
 import 'services/pose_detector.dart';
 import 'services/feature_calculator.dart';
 import 'services/classifier.dart';
@@ -44,13 +44,12 @@ class _HomeScreenState extends State<HomeScreen> {
   final PostureClassifier _classifier = PostureClassifier();
 
   ClassificationResult? _classificationResult;
-  List<PoseLandmark> _detectedLandmarks = [];
 
   @override
   void initState() {
     super.initState();
     _poseDetector.initialize();
-    _classifier.initialize();
+    _classifier.initialize(); // Inicializa el nuevo clasificador
   }
 
   @override
@@ -63,10 +62,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _pickImage(ImageSource source) async {
     final picker = ImagePicker();
     try {
-      final pickedFile = await picker.pickImage(
-        source: source,
-        maxWidth: 1024,
-      );
+      final pickedFile = await picker.pickImage(source: source, maxWidth: 1024);
 
       if (pickedFile != null) {
         setState(() {
@@ -74,7 +70,6 @@ class _HomeScreenState extends State<HomeScreen> {
           _statusMessage = 'Analizando imagen...';
           _isAnalyzing = true;
           _classificationResult = null;
-          _detectedLandmarks = [];
         });
         await _analyzeImage(_imageFile!);
       }
@@ -84,10 +79,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _analyzeImage(File imageFile) async {
-    print("--- INICIANDO ANÁLISIS ---");
+    print("--- INICIANDO ANÁLISIS CON NUEVO MODELO ---");
 
     try {
-      // Detección de pose usando ML Kit (MediaPipe)
       final landmarks = await _poseDetector.detectPose(imageFile);
 
       if (landmarks.isEmpty) {
@@ -95,26 +89,22 @@ class _HomeScreenState extends State<HomeScreen> {
         return;
       }
 
-      // Filtro de puntos críticos (Hombros y Caderas)
-      final requiredLandmarkIds = {5, 6, 11, 12}; 
+      final requiredLandmarkIds = {5, 6, 11, 12};
       final detectedIds = landmarks.map((l) => l.id).toSet();
 
       if (!detectedIds.containsAll(requiredLandmarkIds)) {
-        setState(() {
-          _statusMessage = 'Análisis fallido: Asegúrate de que los hombros y caderas sean visibles.';
-          _isAnalyzing = false;
-        });
+        _showError('Análisis fallido: Asegúrate de que hombros y caderas sean visibles.');
         return;
       }
 
-      // Cálculo de características y clasificación
       final features = FeatureCalculator.calculatePostureFeatures(landmarks);
-      final result = await _classifier.classifyPosture(features);
+      
+      // --- LLAMADA AL NUEVO CLASIFICADOR (SIN ASYNC/AWAIT) ---
+      final result = _classifier.classify(features);
 
       setState(() {
         _statusMessage = 'Análisis completado.';
         _classificationResult = result;
-        _detectedLandmarks = landmarks;
         _isAnalyzing = false;
       });
     } catch (e) {
@@ -138,23 +128,13 @@ class _HomeScreenState extends State<HomeScreen> {
       _statusMessage = 'Selecciona una imagen para analizar tu postura.';
       _isAnalyzing = false;
       _classificationResult = null;
-      _detectedLandmarks = [];
     });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Anatomic AI: Detector Postural'),
-        actions: [
-          if (_imageFile != null && !_isAnalyzing)
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              onPressed: _reset,
-            ),
-        ],
-      ),
+      appBar: AppBar(title: const Text('Anatomic AI: Detector Postural')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -168,65 +148,29 @@ class _HomeScreenState extends State<HomeScreen> {
                   color: Colors.grey.shade50),
               child: _imageFile != null
                   ? Image.file(_imageFile!, fit: BoxFit.contain)
-                  : const Center(
-                  child: Icon(Icons.image, size: 80, color: Colors.grey)),
+                  : const Center(child: Icon(Icons.image, size: 80, color: Colors.grey)),
             ),
             const SizedBox(height: 20),
             Row(
               children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _isAnalyzing ? null : () => _pickImage(ImageSource.camera),
-                    icon: const Icon(Icons.camera_alt),
-                    label: const Text('Cámara'),
-                  ),
-                ),
+                Expanded(child: ElevatedButton.icon(onPressed: _isAnalyzing ? null : () => _pickImage(ImageSource.camera), icon: const Icon(Icons.camera_alt), label: const Text('Cámara'))),
                 const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _isAnalyzing ? null : () => _pickImage(ImageSource.gallery),
-                    icon: const Icon(Icons.photo_library),
-                    label: const Text('Galería'),
-                  ),
-                ),
+                Expanded(child: ElevatedButton.icon(onPressed: _isAnalyzing ? null : () => _pickImage(ImageSource.gallery), icon: const Icon(Icons.photo_library), label: const Text('Galería'))),
               ],
             ),
             const SizedBox(height: 20),
-            if (_isAnalyzing)
-              const Center(child: CircularProgressIndicator()),
-            if (!_isAnalyzing)
-              Text(
-                _statusMessage,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 16),
-              ),
-            if (_classificationResult != null)
-              _buildResultCard(_classificationResult!),
+            if (_isAnalyzing) const Center(child: CircularProgressIndicator()),
+            if (!_isAnalyzing) Text(_statusMessage, textAlign: TextAlign.center, style: const TextStyle(fontSize: 16)),
+            if (_classificationResult != null) _buildResultCard(_classificationResult!),
           ],
         ),
       ),
     );
   }
 
+  // --- TARJETA DE RESULTADOS SIMPLIFICADA ---
   Widget _buildResultCard(ClassificationResult result) {
-    Color cardColor;
-    switch (result.label) {
-      case 'Saludable':
-        cardColor = Colors.green;
-        break;
-      case 'Riesgo Leve':
-        cardColor = Colors.orange;
-        break;
-      case 'Posible escoliosis':
-        cardColor = Colors.red;
-        break;
-      default:
-        cardColor = Colors.grey;
-    }
-
-    // --- NUEVO: Extraer datos de asimetría para mostrarlos ---
-    final double shoulderYDiff = result.rawFeatures.isNotEmpty ? result.rawFeatures[0] : 0.0;
-    final double hipYDiff = result.rawFeatures.length > 1 ? result.rawFeatures[1] : 0.0;
+    final cardColor = result.label == 'Saludable' ? Colors.green : Colors.red;
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 20.0),
@@ -248,20 +192,6 @@ class _HomeScreenState extends State<HomeScreen> {
             Text('Confianza: ${(result.confidence * 100).toStringAsFixed(1)}%'),
             const Divider(),
             Text(result.description, style: const TextStyle(fontSize: 16)),
-            
-            // --- NUEVO: Sección de Datos de Asimetría ---
-            if (result.rawFeatures.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              const Divider(),
-              const SizedBox(height: 8),
-              const Text(
-                'DATOS DE ASIMETRÍA (eje Y)',
-                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black54),
-              ),
-              const SizedBox(height: 8),
-              Text('Diferencia Hombros: ${shoulderYDiff.toStringAsFixed(3)}'),
-              Text('Diferencia Caderas: ${hipYDiff.toStringAsFixed(3)}'),
-            ]
           ],
         ),
       ),
