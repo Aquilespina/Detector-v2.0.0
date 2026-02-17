@@ -188,10 +188,10 @@ packages:
     dependency: "direct main"
     description:
       name: google_mlkit_pose_detection
-      sha256: "6114c9a3327f9d6556949211803d86199d6cc40f16032e3f09a523e74fea0227"
+      sha256: "17f1045db39e6abd29d30d8f0c17f2b25ecce3cc69271279ef2ebb5599437c6a"
       url: "https://pub.dev"
     source: hosted
-    version: "0.11.1"
+    version: "0.11.0"
   hooks:
     dependency: transitive
     description:
@@ -388,10 +388,10 @@ packages:
     dependency: "direct main"
     description:
       name: path_provider
-      sha256: "50c5dd5b6e1aaf6fb3a78b33f6aa3afca52bf903a8a5298f53101fdaee55bbcd"
+      sha256: b27217933eeeba8ff24845c34003b003b2b22151de3c908d0e679e8fe1aa078b
       url: "https://pub.dev"
     source: hosted
-    version: "2.1.5"
+    version: "2.1.2"
   path_provider_android:
     dependency: transitive
     description:

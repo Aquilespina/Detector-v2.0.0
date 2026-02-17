@@ -12,9 +12,10 @@ dependencies:
     sdk: flutter
 
   cupertino_icons: ^1.0.8
-  image_picker: ^1.0.7
+  # --- DEPENDENCIAS MODERNAS Y COMPATIBLES ---
+  image_picker: ^1.1.1
   image: ^4.1.3
-  tflite_flutter: ^0.12.1 # Versión específica y compatible
+  tflite_flutter: ^0.12.1 # Versión moderna para evitar el error 'UnmodifiableUint8ListView'
   path_provider: ^2.1.2
   google_mlkit_pose_detection: ^0.11.0
 

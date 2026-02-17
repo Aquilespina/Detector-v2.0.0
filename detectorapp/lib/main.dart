@@ -1,11 +1,13 @@
 import 'dart:io';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
-// Importar los servicios de IA actualizados
+// Importar los servicios de IA y el nuevo Painter
 import 'services/pose_detector.dart';
 import 'services/feature_calculator.dart';
 import 'services/classifier.dart';
+import 'widgets/pose_painter.dart';
 
 void main() {
   runApp(const MyApp());
@@ -18,10 +20,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Anatomic AI',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        useMaterial3: true,
-      ),
+      theme: ThemeData(primarySwatch: Colors.blue, useMaterial3: true),
       home: const HomeScreen(),
       debugShowCheckedModeBanner: false,
     );
@@ -44,12 +43,16 @@ class _HomeScreenState extends State<HomeScreen> {
   final PostureClassifier _classifier = PostureClassifier();
 
   ClassificationResult? _classificationResult;
+  
+  // --- NUEVO: Estado para el Painter ---
+  ui.Image? _image;
+  List<PoseLandmark> _landmarks = [];
 
   @override
   void initState() {
     super.initState();
+    _classifier.initialize();
     _poseDetector.initialize();
-    _classifier.initialize(); // Inicializa el nuevo clasificador
   }
 
   @override
@@ -59,19 +62,31 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
+  // --- NUEVO: Función para cargar la imagen en el formato correcto para el Painter ---
+  Future<ui.Image> _loadImage(File file) async {
+    final data = await file.readAsBytes();
+    return await decodeImageFromList(data);
+  }
+
   Future<void> _pickImage(ImageSource source) async {
     final picker = ImagePicker();
     try {
       final pickedFile = await picker.pickImage(source: source, maxWidth: 1024);
 
       if (pickedFile != null) {
+        final imageFile = File(pickedFile.path);
+        final image = await _loadImage(imageFile);
+
         setState(() {
-          _imageFile = File(pickedFile.path);
+          _imageFile = imageFile;
+          _image = image;
           _statusMessage = 'Analizando imagen...';
           _isAnalyzing = true;
           _classificationResult = null;
+          _landmarks = []; // Limpiar landmarks antiguos
         });
-        await _analyzeImage(_imageFile!);
+
+        await _analyzeImage(imageFile);
       }
     } catch (e) {
       _showError('Error al obtener la imagen: $e');
@@ -98,13 +113,12 @@ class _HomeScreenState extends State<HomeScreen> {
       }
 
       final features = FeatureCalculator.calculatePostureFeatures(landmarks);
-      
-      // --- LLAMADA AL NUEVO CLASIFICADOR (SIN ASYNC/AWAIT) ---
       final result = _classifier.classify(features);
 
       setState(() {
         _statusMessage = 'Análisis completado.';
         _classificationResult = result;
+        _landmarks = landmarks; // --- NUEVO: Guardar los landmarks para el Painter ---
         _isAnalyzing = false;
       });
     } catch (e) {
@@ -117,14 +131,18 @@ class _HomeScreenState extends State<HomeScreen> {
       _statusMessage = message;
       _isAnalyzing = false;
     });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.red),
-    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message), backgroundColor: Colors.red),
+      );
+    }
   }
 
   void _reset() {
     setState(() {
       _imageFile = null;
+      _image = null;
+      _landmarks = [];
       _statusMessage = 'Selecciona una imagen para analizar tu postura.';
       _isAnalyzing = false;
       _classificationResult = null;
@@ -146,9 +164,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   border: Border.all(color: Colors.grey.shade300),
                   borderRadius: BorderRadius.circular(12),
                   color: Colors.grey.shade50),
-              child: _imageFile != null
-                  ? Image.file(_imageFile!, fit: BoxFit.contain)
-                  : const Center(child: Icon(Icons.image, size: 80, color: Colors.grey)),
+              // --- NUEVO: Usar CustomPaint para dibujar el esqueleto ---
+              child: (_image != null)
+                  ? CustomPaint(
+                      painter: PosePainter(_image!, _landmarks),
+                      size: Size.infinite,
+                    )
+                  : const Center(
+                      child: Icon(Icons.image, size: 80, color: Colors.grey)),
             ),
             const SizedBox(height: 20),
             Row(
@@ -168,7 +191,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // --- TARJETA DE RESULTADOS SIMPLIFICADA ---
   Widget _buildResultCard(ClassificationResult result) {
     final cardColor = result.label == 'Saludable' ? Colors.green : Colors.red;
 
@@ -184,10 +206,7 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              result.label.toUpperCase(),
-              style: TextStyle(color: cardColor, fontWeight: FontWeight.bold, fontSize: 20),
-            ),
+            Text(result.label.toUpperCase(), style: TextStyle(color: cardColor, fontWeight: FontWeight.bold, fontSize: 20)),
             const SizedBox(height: 8),
             Text('Confianza: ${(result.confidence * 100).toStringAsFixed(1)}%'),
             const Divider(),
