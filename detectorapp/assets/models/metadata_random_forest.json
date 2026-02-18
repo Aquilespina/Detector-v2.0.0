@@ -1,0 +1,29 @@
+{
+  "modelo": "RandomForest",
+  "umbral_recomendado": 0.49999999999999994,
+  "n_features": 4,
+  "feature_names": [
+    "ASIM_HIP_NORM",
+    "ASIM_ELBOW_NORM",
+    "ASIM_WRIST_NORM",
+    "ASIM_SHOULDER_NORM"
+  ],
+  "feature_importance": {
+    "ASIM_HIP_NORM": 0.2576383218456481,
+    "ASIM_ELBOW_NORM": 0.22304108772133455,
+    "ASIM_WRIST_NORM": 0.2514896851770483,
+    "ASIM_SHOULDER_NORM": 0.2678309052559692
+  },
+  "metricas": {
+    "accuracy": 0.5081967213114754,
+    "sensitivity": 0.5986842105263158,
+    "specificity": 0.358695652173913,
+    "precision": 0.6066666666666667,
+    "f1_score": 0.6026490066225165,
+    "roc_auc": 0.5237414187643021,
+    "fp": 59,
+    "fn": 61
+  },
+  "formula": "d_norm = sqrt((x_r-x_l)^2 + (y_r-y_l)^2)",
+  "nota": "Coordenadas normalizadas de MediaPipe (0-1)"
+}
